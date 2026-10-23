@@ -78,3 +78,10 @@ export function validate(board) {
   }
   return board
 }
+
+// Search returns ordered IDs; it never changes the persisted board.
+export function filterBoard(board, query) {
+  const needle = query.trim().toLowerCase()
+  return Object.fromEntries(COLUMNS.map(([column]) => [column, board.columns[column]
+    .filter(card => card.text.toLowerCase().includes(needle)).map(card => card.id)]))
+}

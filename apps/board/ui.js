@@ -1,4 +1,4 @@
-import { COLUMNS, applyAction, emptyBoard, neighbour } from './logic.js'
+import { COLUMNS, applyAction, emptyBoard, neighbour, filterBoard } from './logic.js'
 
 const $ = id => document.getElementById(id)
 function el(tag, { dataset = {}, ...props } = {}, ...kids) {
@@ -20,6 +20,7 @@ const store = mode => db.transaction('kv', mode).objectStore('kv')
 let board = (await req(store('readonly').get('board'))) ?? emptyBoard()
 let editing = null
 let saves = 0
+let searchQuery = ''
 
 async function save() {
   const tx = db.transaction('kv', 'readwrite')
@@ -60,12 +61,14 @@ function cardView(col, card, index, count) {
 
 function columnView([col, title]) {
   const cards = board.columns[col]
+  const visible = new Set(filterBoard(board, searchQuery)[col])
+  const matches = cards.filter(card => visible.has(card.id))
   const input = el('input', { placeholder: 'Add a card', required: true, pattern: '.*\\S.*', dataset: { testid: `new-${col}` } })
   const form = el('form', { onsubmit: e => { e.preventDefault(); dispatch({ type: 'add', column: col, text: input.value }) } },
     input, el('button', { textContent: 'Add', dataset: { testid: `add-${col}` } }))
   const section = el('section', { className: 'column', dataset: { testid: `column-${col}`, column: col } },
-    el('h2', {}, title, el('span', { textContent: cards.length })),
-    el('ol', {}, ...cards.map((card, i) => cardView(col, card, i, cards.length))),
+    el('h2', {}, title, el('span', { textContent: searchQuery.trim() ? `${matches.length}/${cards.length}` : String(cards.length) })),
+    el('ol', {}, ...matches.map(card => cardView(col, card, cards.indexOf(card), cards.length))),
     form)
   section.ondragover = e => { e.preventDefault(); section.classList.add('over') }
   section.ondragleave = () => section.classList.remove('over')
@@ -78,6 +81,8 @@ function render() {
   $('board').replaceChildren(...COLUMNS.map(columnView))
   if (focused?.startsWith('new-')) document.querySelector(`[data-testid="${focused}"]`).focus()
 }
+
+$('search').oninput = () => { searchQuery = $('search').value; render() }
 
 $('export').onclick = () => {
   const url = URL.createObjectURL(new Blob([JSON.stringify(board, null, 2)], { type: 'application/json' }))
